@@ -1,4 +1,3 @@
-/* Unused vars are disabled*/
 export default function taskBlock(trueOrFalse) {
   const task = false;
   const task2 = true;
