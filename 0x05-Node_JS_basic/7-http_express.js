@@ -1,61 +1,75 @@
+// A small HTTP server using Express module
+
 const express = require('express');
+
+const port = 1245;
+const app = express();
+const path = process.argv[2];
 const fs = require('fs');
 
-const COLUMN_COUNT = 4;
-
-function countStudents(path) {
+async function countStudents(path) {
   return new Promise((resolve, reject) => {
-    fs.readFile(path, { encoding: 'utf8' }, (err, data) => {
+    fs.readFile(path, 'utf8', (err, data) => {
       if (err) {
         reject(new Error('Cannot load the database'));
-      } else {
-        const arrOfStudents = data.split('\n');
-        const arrLength = arrOfStudents.length;
-        const numOfStudents = arrOfStudents[arrLength - 1] ? arrLength - 1 : arrLength - 2;
-        const strList = ['This is the list of our students'];
-        strList.push(`Number of students: ${numOfStudents}`);
-        const deptDict = {};
-        arrOfStudents.slice(1, arrLength).forEach((student) => {
-          if (student) {
-            const studentArr = student.split(',');
-            if (deptDict[studentArr[COLUMN_COUNT - 1]]) {
-              deptDict[studentArr[COLUMN_COUNT - 1]].push(studentArr[0]);
-            } else {
-              deptDict[studentArr[COLUMN_COUNT - 1]] = [studentArr[0]];
-            }
-          }
-        });
-        for (const dept in deptDict) {
-          if (dept) {
-            strList.push(`Number of students in ${dept}: ${deptDict[dept].length}. List: ${deptDict[dept].join(', ')}`);
-          }
-        }
-        resolve(strList);
+        return;
       }
+
+      const lines = data.trim().split('\n').filter((line) => line.trim() !== '');
+      const students = lines.slice(1).map((line) => line.split(','));
+
+      const fields = {};
+      let totalStudents = 0;
+
+      for (const student of students) {
+        const [firstname, , , field] = student;
+        if (!fields[field]) {
+          fields[field] = [];
+        }
+        fields[field].push(firstname);
+        totalStudents += 1;
+      }
+      let ret = '';
+      ret += 'This is the list of our students\n';
+      ret += `Number of students: ${totalStudents}\n`;
+      // eslint-disable-next-line guard-for-in
+      for (const field in fields) {
+        const count = fields[field].length;
+        const list = fields[field].join(', ');
+        ret += `Number of students in ${field}: ${count}. List: ${list}\n`;
+      }
+
+      resolve(ret.slice(0, -1));
     });
   });
 }
-
-const app = express();
 
 app.get('/', (req, res) => {
   res.send('Hello Holberton School!');
 });
 
-app.get('/students', async (req, res) => {
-  try {
-    const listsArray = await countStudents(process.argv[2]);
-    let strOutput = '';
-    listsArray.forEach((str, idx) => {
-      const strAug = idx > 0 ? `\n${str}` : str;
-      strOutput += strAug;
+app.get('/students', (req, res) => {
+  countStudents(path)
+    .then((output) => {
+      res.send(output);
+    })
+    .catch((error) => {
+      res.end(`This is the list of our students\n${error}`);
     });
-    res.send(strOutput);
-  } catch (err) {
-    res.send('Cannot load the database');
-  }
 });
 
-app.listen(1245, () => {});
+app.use((req, res) => {
+  res.status(404).send(`<!DOCTYPE html>
+    <html lang="en">
+    <head>
+    <meta charset="utf-8">
+    <title>Error</title>
+    </head>
+    <body>
+    <pre>Cannot GET ${req.url}</pre>
+    </body>
+    </html>`);
+});
 
+app.listen(port);
 module.exports = app;
